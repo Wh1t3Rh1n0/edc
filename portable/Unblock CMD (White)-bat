@@ -1,0 +1,9 @@
+@echo off
+:loop
+color f0
+echo [%date% %time% Local Time]
+echo [%cd%]
+set /p input=%username%@%computername%^>
+%input%
+echo.
+goto loop
