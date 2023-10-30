@@ -14,3 +14,4 @@
 ## Notes on use
 
 - Portable files need to be renamed after download to make them work. Just change the `-` to a `.`.
+    - `rename-all.bat` is included in the `portable` folder to quickly rename them all at once.
