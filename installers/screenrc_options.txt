@@ -1,0 +1,2 @@
+caption always
+caption string "%{kw}%-w%{wr}%n %t%{-}%+w"

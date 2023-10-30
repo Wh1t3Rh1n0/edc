@@ -11,7 +11,15 @@
 - Shortcut to prevent screen from locking.
 - Batch file to run the white command prompt when it's blocked by Group Policy.
 
+
 ## Notes on use
 
 - Portable files need to be renamed after download to make them work. Just change the `-` to a `.`.
-    - `rename-all.bat` is included in the `portable` folder to quickly rename them all at once.
+
+
+
+## Changelog
+
+- **2023-10-23**
+	- Added `rename-all.bat` to the `portable` folder to quickly rename the portable files to their correct extensions all at once.
+	- Added `.screenrc` customizations to the bash installer.
