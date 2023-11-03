@@ -5,6 +5,9 @@ alias wget="wget -e robots=off -U 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:
 # Set default nano parameters. Tab width 4. Spaces, not tabs. Wrap lines.
 alias nano='nano -\$iET 4'
 
+# ls in color
+alias ls='ls --color'
+
 # Fix screen in WSL.
 export SCREENDIR=$HOME/.screen
 
