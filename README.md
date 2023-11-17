@@ -25,12 +25,18 @@
 - **Shift** - Second version that pressed Shift only once every 290 seconds. But it turned out that Windows dings every time Shift is pressed from a minimized window. It seemed to happen when the window was hidden on other desktops too.
 - **NumLock X2** - This is the original method, and it works well *except* on the latest versions of Windows where a pop-up box gets displayed every time NumLock is turned on/off. That was getting in the way of my screenshots when I'd switch between virtual machines, so I tried some alternatives.
 
+SendKeys References:
+- https://learn.microsoft.com/en-us/office/vba/Language/Reference/user-interface-help/sendkeys-statement
+- https://ss64.com/vb/sendkeys.html
+
+
 
 ## Changelog
 
 - **2023-11-17**
     - Added `Don't Lock Screen Variants` that prevent screen locking with alternative keypresses.
     - Increased the delay on all "Don't Lock Screen" shortcuts to 290 seconds.
+    - Minor bashrc and screenrc changes.
 
 - **2023-10-23**
 	- Added `rename-all.bat` to the `portable` folder to quickly rename the portable files to their correct extensions all at once.
