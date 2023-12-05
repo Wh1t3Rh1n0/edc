@@ -20,9 +20,11 @@
 
 ## Notes on the "Don't Lock Screen" variants
 
-- **Insert X2** - Presses Insert two times in rapid succession. No noticeable issues so far, but be wary, since it is pressing a key that could affect input.
-- **Vol-+** - Third try. Quickly pressed volume down and then volume up. Caused a pop-up like NumLock.
-- **Shift** - Second version that pressed Shift only once every 290 seconds. But it turned out that Windows dings every time Shift is pressed from a minimized window. It seemed to happen when the window was hidden on other desktops too.
+- **Vol-+** - Quickly press volume down and then volume up. Causes a pop-up like NumLock.
+- **Insert X2** - Presses Insert two times in rapid succession.
+	- Potential issue: If you're pressing/holding Shift when this triggers, you're clipboard contents will get pasted. Not ideal. 😝
+- **Shift** - Presses Shift once every 290 seconds.
+	- Potential issue: Windows dings every time Shift is pressed from a minimized window. It seems to happen when the window is hidden on other desktops too.
 - **NumLock X2** - This is the original method, and it works well *except* on the latest versions of Windows where a pop-up box gets displayed every time NumLock is turned on/off. That was getting in the way of my screenshots when I'd switch between virtual machines, so I tried some alternatives.
 
 SendKeys References:
