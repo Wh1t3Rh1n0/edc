@@ -11,6 +11,7 @@
 - Enhance colors, fonts, and sizes of cmd.exe and powershell.exe for clear screenshots (portable versions only).
 - Shortcuts to prevent screen from locking.
 - Batch file to run the white command prompt when it's blocked by Group Policy.
+- Other miscellaneous stuff.
 
 
 ## Notes on use
@@ -20,7 +21,7 @@
 
 ## Notes on the "Don't Lock Screen" variants
 
-- **Vol-+** - Quickly press volume down and then volume up. Causes a pop-up like NumLock.
+- **Vol-+** - Quickly press volume down and then volume up. Causes a pop-up, but not as intrusive as NumLock (such as when switching between host and virtual machines).
 - **Insert X2** - Presses Insert two times in rapid succession.
 	- Potential issue: If you're pressing/holding Shift when this triggers, you're clipboard contents will get pasted. Not ideal. 😝
 - **Shift** - Presses Shift once every 290 seconds.
@@ -34,6 +35,9 @@ SendKeys References:
 
 
 ## Changelog
+
+- **2023-12-06**
+    - Added `Toggle Numlock-lnk`. 
 
 - **2023-11-17**
     - Added `Don't Lock Screen Variants` that prevent screen locking with alternative keypresses.
