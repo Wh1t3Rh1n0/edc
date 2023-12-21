@@ -11,7 +11,7 @@
 - Enhance colors, fonts, and sizes of cmd.exe and powershell.exe for clear screenshots (portable versions only).
 - Shortcuts to prevent screen from locking.
 - Batch file to run the white command prompt when it's blocked by Group Policy.
-- Other miscellaneous stuff.
+- Miscellaneous scripts that come in handy for setting up Windows virtual machines.
 
 
 ## Notes on use
