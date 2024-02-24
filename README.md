@@ -36,6 +36,10 @@ SendKeys References:
 
 ## Changelog
 
+- **2024-02-23**
+	- Added installer for Windows Terminal settings, `install_WindowsTerminal_colors_and_settings.bat`.
+	- Added scripts and notes in `vm-tools`.
+
 - **2023-12-06**
     - Added `Toggle Numlock-lnk`. 
 

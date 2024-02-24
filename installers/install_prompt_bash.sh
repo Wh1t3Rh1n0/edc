@@ -40,10 +40,10 @@ fi
 
 echo >> ~/.bashrc
 echo "### This section added by EDC ###" >> ~/.bashrc
-cat bashrc_options.txt >> ~/.bashrc
+cat resources-bash/bashrc_options.txt >> ~/.bashrc
 echo "### End section added by EDC ###" >> ~/.bashrc
 
-cat screenrc_options.txt > ~/.screenrc
+cat resources-bash/screenrc_options.txt > ~/.screenrc
 
 sudo usermod -s $(which bash) $(whoami)
 
