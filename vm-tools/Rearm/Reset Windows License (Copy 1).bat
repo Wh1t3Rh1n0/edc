@@ -1,7 +1,7 @@
 @echo off
 
-echo Rearm Windows 10 Evaluation License
-echo ===================================
+echo Rearm Windows Evaluation License
+echo ================================
 
 :: Check Permissions
 echo Administrative permissions required. Detecting permissions...

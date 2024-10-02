@@ -18,6 +18,9 @@ export TZ=UTC
 PS1='\n[\D{%F %T %Z}]\n[\[\033[01;34m\]\w\[\033[00m\]]\n\[\e]0;\u@\h: \w\a\]${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\$ '
 
 # Print margins, so I know my terminal window is not too wide for screenshots. ;)
-echo '--------10--------20--------30--------40--------50--------60--------70--------80--------90'
+alias margin="echo '--------10--------20--------30--------40--------50--------60--------70--------80--------90'"
+
+# Unset TERMCAP to fix a bug in Caddy that prevents it from correctly parsing YAML files inside a screen session.
+unset TERMCAP
 
 

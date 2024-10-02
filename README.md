@@ -36,6 +36,9 @@ SendKeys References:
 
 ## Changelog
 
+- **2024-09-25**
+    - Minor changes to `bashrc_options.txt` to fix bugs with `screen`+`caddy` and `scp`.
+
 - **2024-02-23**
 	- Added installer for Windows Terminal settings, `install_WindowsTerminal_colors_and_settings.bat`.
 	- Added scripts and notes in `vm-tools`.

@@ -17,6 +17,6 @@ The evaluation period can be reset twice for each product, so these scripts auto
 2. Copy the Rearm folder to the desktop.
 3. When the evaluation period ends, right-click the first rearm script and **Run as Administrator**.
 4. Reboot to restart the evaluation period.
-5. Repeat if necessary.
+5. Reboot again, if needed, to reset the evaluation period text shown on the Windows desktop.
 
 
