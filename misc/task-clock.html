@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Task Timer</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap');
+        
+        body {
+            font-family: 'Roboto', system-ui, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f8f9fa;
+            color: #212529;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 20px;
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        .clocks {
+            display: flex;
+            gap: 30px;
+            flex-wrap: wrap;
+        }
+        .clock {
+            text-align: center;
+        }
+        .clock-label {
+            font-size: 14px;
+            font-weight: 500;
+            color: #6c757d;
+            margin-bottom: 4px;
+        }
+        .clock-value {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -2px;
+            line-height: 1;
+        }
+        #total-time { color: #0d6efd; }
+        #break-time { color: #dc3545; }
+        #distracted-time { color: #fd7e14; }
+        #pomodoro-countdown { color: #6f42c1; }
+        
+        #break-btn, #reset-btn, #test-notif-btn {
+            padding: 14px 24px;
+            font-size: 17px;
+            font-weight: 500;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+        #break-btn:not(.active) {
+            background: #0d6efd;
+            color: white;
+        }
+        #break-btn.active {
+            background: #dc3545;
+            color: white;
+        }
+        #reset-btn {
+            background: #6c757d;
+            color: white;
+        }
+        #test-notif-btn {
+            background: #6f42c1;
+            color: white;
+        }
+
+        #task-list {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .task-row {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            border-bottom: 1px solid #e9ecef;
+            transition: all 0.2s;
+        }
+        .task-row:last-child {
+            border-bottom: none;
+        }
+        .task-row.running {
+            background: #e8f5e9;
+            border-left: 5px solid #28a745;
+        }
+        .task-name {
+            flex: 1;
+            font-size: 18px;
+            padding: 10px 14px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            min-width: 220px;
+        }
+        .task-name:focus {
+            outline: none;
+            border-color: #0d6efd;
+            box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
+        }
+        .task-time {
+            font-family: monospace;
+            font-size: 24px;
+            font-weight: 500;
+            width: 110px;
+            text-align: right;
+            color: #495057;
+        }
+        .start-btn {
+            padding: 10px 24px;
+            font-size: 17px;
+            font-weight: 500;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            min-width: 110px;
+            color: white;
+            transition: all 0.2s;
+        }
+        .start-btn.start {
+            background: #28a745;
+        }
+        .start-btn.pause {
+            background: #dc3545;
+        }
+        .action-btn {
+            padding: 8px 14px;
+            font-size: 15px;
+            border: 1px solid #ced4da;
+            background: white;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .action-btn:hover {
+            background: #f8f9fa;
+        }
+        .new-row {
+            background: #f8f9fa;
+            font-style: italic;
+        }
+        .new-row .task-name {
+            color: #6c757d;
+        }
+        .quick-switch {
+            padding: 8px 12px;
+            font-size: 15px;
+            border: 1px solid #ced4da;
+            border-radius: 6px;
+            background: white;
+            min-width: 180px;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #6c757d;
+            font-size: 13px;
+        }
+        .info {
+            background: #fff3cd;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        /* ====================== COMPACT MODE ====================== */
+        @media (max-width: 700px) {
+            body { padding: 10px; }
+            header { padding: 15px; gap: 15px; }
+            .clock-value { font-size: 38px; }
+            .task-row { 
+                padding: 12px 15px; 
+                gap: 10px; 
+                flex-wrap: wrap; 
+            }
+            .task-name { 
+                min-width: 100%; 
+                font-size: 17px; 
+            }
+            .task-time { font-size: 21px; width: 90px; }
+            .start-btn { min-width: 90px; padding: 9px 16px; font-size: 16px; }
+            .action-btn { font-size: 14px; padding: 6px 10px; }
+            .quick-switch { min-width: 100%; margin-top: 8px; }
+            .clocks { gap: 20px; }
+            #task-list .task-row:not(.new-row):not(.running) {
+                display: none !important;
+            }
+            .info { font-size: 13px; padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="info">
+        <strong>✅ How to use:</strong> Type task name → click <strong>Start</strong> or press <strong>Enter</strong>. 
+        Duplicate names resume the old task. 25-min Pomodoro countdown + auto check-in. 
+        Test button for notifications. Compact mode (small window) shows only active task + new row with quick-switch dropdown.
+    </div>
+
+    <header>
+        <div class="clocks">
+            <div class="clock">
+                <div class="clock-label">TOTAL WORK TIME</div>
+                <div id="total-time" class="clock-value">00:00:00</div>
+            </div>
+            <div class="clock">
+                <div class="clock-label">BREAK TIME</div>
+                <div id="break-time" class="clock-value">00:00:00</div>
+            </div>
+            <div class="clock">
+                <div class="clock-label">DISTRACTED TIME</div>
+                <div id="distracted-time" class="clock-value">00:00:00</div>
+            </div>
+            <div class="clock">
+                <div class="clock-label">POMODORO COUNTDOWN</div>
+                <div id="pomodoro-countdown" class="clock-value">25:00</div>
+            </div>
+        </div>
+        
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button id="break-btn">Start Break</button>
+            <button id="reset-btn">Reset All</button>
+            <button id="test-notif-btn">Test Notification</button>
+        </div>
+    </header>
+
+    <div id="task-list"></div>
+
+    <footer>
+        All data saved automatically in your browser (localStorage) • Completely offline &amp; private • 
+        Notifications require one-time permission (click Test button to check)
+    </footer>
+
+    <script>
+        // ====================== DATA & STATE ======================
+        let tasks = [];
+        let currentRunningId = null;
+        let isBreak = false;
+        let breakSeconds = 0;
+        let distractedSeconds = 0;
+        let nextCheckinTime = 0;
+        let compactMode = false;
+        let tickInterval = null;
+
+        // ====================== UTILS ======================
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function formatMinutesSeconds(seconds) {
+            const m = Math.floor(seconds / 60);
+            const s = seconds % 60;
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+        }
+
+        function getTotalSeconds() {
+            return tasks.reduce((sum, task) => sum + task.seconds, 0);
+        }
+
+        function saveToLocal() {
+            localStorage.setItem('simpleTaskTimer_data', JSON.stringify({
+                tasks,
+                breakSeconds,
+                distractedSeconds
+            }));
+        }
+
+        function loadFromLocal() {
+            const saved = localStorage.getItem('simpleTaskTimer_data');
+            if (saved) {
+                const data = JSON.parse(saved);
+                tasks = data.tasks || [];
+                breakSeconds = data.breakSeconds || 0;
+                distractedSeconds = data.distractedSeconds || 0;
+            } else {
+                tasks = [];
+                breakSeconds = 0;
+                distractedSeconds = 0;
+            }
+        }
+
+        // ====================== TICK ======================
+        function tick() {
+            // Increment running task
+            if (currentRunningId !== null && !isBreak) {
+                const task = tasks.find(t => t.id === currentRunningId);
+                if (task) task.seconds++;
+            }
+            
+            // Increment break
+            if (isBreak) breakSeconds++;
+            
+            // 25-minute check-in logic
+            if (currentRunningId !== null && !isBreak && nextCheckinTime > 0) {
+                const now = Date.now();
+                if (now >= nextCheckinTime) {
+                    triggerCheckin();
+                    nextCheckinTime = now + 25 * 60 * 1000;
+                }
+            }
+            
+            // Update everything
+            updateAllTimeDisplays();
+            updateHeaderDisplays();
+        }
+
+        function startTickInterval() {
+            if (tickInterval) return;
+            tickInterval = setInterval(tick, 1000);
+        }
+
+        // ====================== DISPLAY UPDATES ======================
+        function updateAllTimeDisplays() {
+            tasks.forEach(task => {
+                const span = document.getElementById(`time-${task.id}`);
+                if (span) span.textContent = formatTime(task.seconds);
+            });
+        }
+
+        function updateHeaderDisplays() {
+            document.getElementById('total-time').textContent = formatTime(getTotalSeconds());
+            document.getElementById('break-time').textContent = formatTime(breakSeconds);
+            document.getElementById('distracted-time').textContent = formatTime(distractedSeconds);
+
+            // Pomodoro countdown
+            const pomodoroEl = document.getElementById('pomodoro-countdown');
+            if (currentRunningId === null || isBreak || nextCheckinTime <= 0) {
+                pomodoroEl.textContent = '—';
+            } else {
+                const remainingMs = nextCheckinTime - Date.now();
+                const remainingSec = Math.max(0, Math.ceil(remainingMs / 1000));
+                pomodoroEl.textContent = formatMinutesSeconds(remainingSec);
+            }
+        }
+
+        function updateButtonsAndStyles() {
+            document.querySelectorAll('.start-btn').forEach(btn => {
+                const id = btn.dataset.id;
+                if (id === 'new') {
+                    btn.textContent = 'Start';
+                    btn.className = 'start-btn start';
+                    return;
+                }
+                const isRunning = parseInt(id) === currentRunningId;
+                btn.textContent = isRunning ? 'Pause' : 'Start';
+                btn.className = isRunning ? 'start-btn pause' : 'start-btn start';
+            });
+
+            document.querySelectorAll('.task-row').forEach(row => {
+                const id = row.dataset.id;
+                if (id === 'new') return;
+                row.classList.toggle('running', parseInt(id) === currentRunningId);
+            });
+        }
+
+        // ====================== COMPACT MODE ======================
+        function checkCompactMode() {
+            const shouldBeCompact = window.innerWidth < 700;
+            if (shouldBeCompact !== compactMode) {
+                compactMode = shouldBeCompact;
+                render();
+            }
+        }
+
+        // ====================== RENDER ======================
+        function createTaskRow(task) {
+            const row = document.createElement('div');
+            row.className = 'task-row';
+            row.dataset.id = task.id;
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'task-name';
+            nameInput.value = task.name || '';
+            nameInput.addEventListener('input', () => {
+                task.name = nameInput.value;
+                saveToLocal();
+            });
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'task-time';
+            timeSpan.id = `time-${task.id}`;
+            timeSpan.textContent = formatTime(task.seconds);
+
+            const startBtn = document.createElement('button');
+            startBtn.className = 'start-btn start';
+            startBtn.textContent = 'Start';
+            startBtn.dataset.id = task.id;
+            startBtn.addEventListener('click', () => handleStartClick(task.id));
+
+            const subBtn = document.createElement('button');
+            subBtn.className = 'action-btn';
+            subBtn.textContent = '− 5 min';
+            subBtn.addEventListener('click', () => subtractTime(task.id));
+
+            const delBtn = document.createElement('button');
+            delBtn.className = 'action-btn';
+            delBtn.textContent = 'Delete';
+            delBtn.addEventListener('click', () => deleteTask(task.id));
+
+            row.append(nameInput, timeSpan, startBtn, subBtn, delBtn);
+            return row;
+        }
+
+        function createNewRow() {
+            const row = document.createElement('div');
+            row.className = 'task-row new-row';
+            row.dataset.id = 'new';
+
+            const nameInput = document.createElement('input');
+            nameInput.type = 'text';
+            nameInput.className = 'task-name';
+            nameInput.placeholder = 'New task name...';
+            nameInput.addEventListener('input', () => {});
+            nameInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    handleNewTaskStart();
+                }
+            });
+
+            const timeSpan = document.createElement('span');
+            timeSpan.className = 'task-time';
+            timeSpan.textContent = '00:00:00';
+
+            const startBtn = document.createElement('button');
+            startBtn.className = 'start-btn start';
+            startBtn.textContent = 'Start';
+            startBtn.dataset.id = 'new';
+            startBtn.addEventListener('click', handleNewTaskStart);
+
+            // Quick-switch dropdown ONLY in compact mode
+            if (compactMode) {
+                const quickSelect = document.createElement('select');
+                quickSelect.className = 'quick-switch';
+                
+                const defaultOpt = document.createElement('option');
+                defaultOpt.value = '';
+                defaultOpt.textContent = '— Quick switch to existing task —';
+                quickSelect.appendChild(defaultOpt);
+
+                tasks.forEach(task => {
+                    const opt = document.createElement('option');
+                    opt.value = task.id;
+                    opt.textContent = task.name || 'Untitled Task';
+                    quickSelect.appendChild(opt);
+                });
+
+                quickSelect.addEventListener('change', () => {
+                    const selectedId = parseInt(quickSelect.value);
+                    if (!isNaN(selectedId)) {
+                        handleStartClick(selectedId);
+                        quickSelect.value = '';
+                    }
+                });
+
+                row.append(nameInput, timeSpan, startBtn, quickSelect);
+            } else {
+                const spacer = document.createElement('div');
+                spacer.style.width = '110px';
+                row.append(nameInput, timeSpan, startBtn, spacer);
+            }
+
+            return row;
+        }
+
+        function render() {
+            const container = document.getElementById('task-list');
+            container.innerHTML = '';
+            
+            if (compactMode) {
+                const runningTask = tasks.find(t => t.id === currentRunningId);
+                if (runningTask) {
+                    container.appendChild(createTaskRow(runningTask));
+                }
+            } else {
+                tasks.forEach(task => {
+                    container.appendChild(createTaskRow(task));
+                });
+            }
+            
+            container.appendChild(createNewRow());
+            
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+        }
+
+        // ====================== ACTIONS ======================
+        function handleStartClick(id) {
+            if (currentRunningId === id) {
+                currentRunningId = null;
+                nextCheckinTime = 0;
+            } else {
+                currentRunningId = id;
+                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+            }
+            startTickInterval();
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+            saveToLocal();
+        }
+
+        function handleNewTaskStart() {
+            const nameInput = document.querySelector('.new-row .task-name');
+            let name = nameInput ? nameInput.value.trim() : '';
+            if (!name) name = 'Untitled Task';
+
+            // Check for existing task with same name (case-insensitive)
+            const existing = tasks.find(t => t.name.toLowerCase() === name.toLowerCase());
+            if (existing) {
+                // Resume existing task instead of duplicating
+                currentRunningId = existing.id;
+                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+            } else {
+                // Create new task
+                const newId = Date.now();
+                tasks.push({
+                    id: newId,
+                    name: name,
+                    seconds: 0
+                });
+                currentRunningId = newId;
+                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+            }
+
+            // Clear input
+            if (nameInput) nameInput.value = '';
+            
+            saveToLocal();
+            startTickInterval();
+            render();
+        }
+
+        function deleteTask(id) {
+            if (!confirm('Delete this task and all its recorded time?')) return;
+            tasks = tasks.filter(t => t.id !== id);
+            if (currentRunningId === id) {
+                currentRunningId = null;
+                nextCheckinTime = 0;
+            }
+            saveToLocal();
+            render();
+        }
+
+        function subtractTime(id) {
+            const minutesStr = prompt('Subtract how many minutes from this task?', '5');
+            if (minutesStr === null) return;
+            const minutes = parseFloat(minutesStr);
+            if (isNaN(minutes) || minutes <= 0) return;
+            
+            const task = tasks.find(t => t.id === id);
+            if (task) {
+                const secondsToRemove = Math.floor(minutes * 60);
+                task.seconds = Math.max(0, task.seconds - secondsToRemove);
+                distractedSeconds += secondsToRemove;
+                saveToLocal();
+                updateAllTimeDisplays();
+                updateHeaderDisplays();
+            }
+        }
+
+        function toggleBreak() {
+            isBreak = !isBreak;
+            if (isBreak) {
+                currentRunningId = null;
+                nextCheckinTime = 0;
+                document.getElementById('break-btn').textContent = 'End Break';
+                document.getElementById('break-btn').classList.add('active');
+            } else {
+                document.getElementById('break-btn').textContent = 'Start Break';
+                document.getElementById('break-btn').classList.remove('active');
+            }
+            startTickInterval();
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+            saveToLocal();
+        }
+
+        function resetAll() {
+            if (!confirm('Reset EVERYTHING?\n\nThis will permanently delete ALL tasks, times, break time, distracted time, and settings.')) return;
+            
+            localStorage.removeItem('simpleTaskTimer_data');
+            tasks = [];
+            breakSeconds = 0;
+            distractedSeconds = 0;
+            currentRunningId = null;
+            nextCheckinTime = 0;
+            isBreak = false;
+            
+            document.getElementById('break-btn').textContent = 'Start Break';
+            document.getElementById('break-btn').classList.remove('active');
+            
+            render();
+            updateHeaderDisplays();
+        }
+
+        // ====================== NOTIFICATIONS ======================
+        function triggerCheckin() {
+            if (currentRunningId === null) return;
+            const task = tasks.find(t => t.id === currentRunningId);
+            if (!task) return;
+            const taskName = task.name || 'Untitled Task';
+
+            if (!('Notification' in window)) return;
+
+            const show = () => {
+                const notif = new Notification(`Still working on "${taskName}"?`, {
+                    body: "25 minutes have passed.\n\nClick = No (pause & switch)\nIgnore = Yes (continue)",
+                    tag: "task-checkin",
+                    requireInteraction: true
+                });
+
+                const timeoutId = setTimeout(() => {
+                    handleIdleTimeout();
+                    notif.close();
+                }, 120000);
+
+                notif.onclick = () => {
+                    clearTimeout(timeoutId);
+                    notif.close();
+                    handleNoClick();
+                };
+            };
+
+            if (Notification.permission === 'granted') {
+                show();
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') show();
+                });
+            }
+        }
+
+        function handleNoClick() {
+            if (currentRunningId !== null) {
+                currentRunningId = null;
+                nextCheckinTime = 0;
+                window.focus();
+                updateButtonsAndStyles();
+                updateHeaderDisplays();
+                saveToLocal();
+            }
+        }
+
+        function handleIdleTimeout() {
+            if (currentRunningId !== null) {
+                const task = tasks.find(t => t.id === currentRunningId);
+                if (task) task.seconds = Math.max(0, task.seconds - 120);
+                currentRunningId = null;
+                nextCheckinTime = 0;
+                window.focus();
+                saveToLocal();
+                updateAllTimeDisplays();
+                updateHeaderDisplays();
+                updateButtonsAndStyles();
+            }
+        }
+
+        function sendTestNotification() {
+            if (!('Notification' in window)) {
+                alert('Notifications are not supported in this browser.');
+                return;
+            }
+
+            const show = () => {
+                const notif = new Notification('✅ Test Notification', {
+                    body: 'Notifications are working perfectly!\n\nThis is just a test — your 25-minute check-ins will look similar.',
+                    tag: 'test-notif'
+                });
+                notif.onclick = () => notif.close();
+            };
+
+            if (Notification.permission === 'granted') {
+                show();
+            } else if (Notification.permission === 'default') {
+                Notification.requestPermission().then(perm => {
+                    if (perm === 'granted') show();
+                    else alert('Notification permission was denied. Please allow notifications in your browser settings and try again.');
+                });
+            } else {
+                alert('Notification permission is blocked. Please enable it in your browser settings and refresh the page.');
+            }
+        }
+
+        // ====================== INITIALIZE ======================
+        function init() {
+            loadFromLocal();
+            
+            // Request notification permission early
+            if ('Notification' in window && Notification.permission === 'default') {
+                Notification.requestPermission();
+            }
+            
+            // If a task was running before reload, restart the 25-min countdown
+            if (currentRunningId !== null) {
+                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+            }
+            
+            const breakBtn = document.getElementById('break-btn');
+            breakBtn.addEventListener('click', toggleBreak);
+            
+            const resetBtn = document.getElementById('reset-btn');
+            resetBtn.addEventListener('click', resetAll);
+            
+            const testBtn = document.getElementById('test-notif-btn');
+            testBtn.addEventListener('click', sendTestNotification);
+            
+            // Initial render
+            compactMode = window.innerWidth < 700;
+            render();
+            
+            // Start ticking
+            startTickInterval();
+            
+            // Resize handler
+            window.addEventListener('resize', checkCompactMode);
+            
+            // Keyboard shortcut: Ctrl/Cmd + K to focus new task
+            document.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+                    e.preventDefault();
+                    const newInput = document.querySelector('.new-row .task-name');
+                    if (newInput) newInput.focus();
+                }
+            });
+            
+            // Initial header update
+            updateHeaderDisplays();
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>

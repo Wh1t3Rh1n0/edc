@@ -36,6 +36,9 @@ SendKeys References:
 
 ## Changelog
 
+- **2026-03-10**
+    - Added `misc` folder for random, handy things that didn't really fit elsewhere.
+
 - **2024-09-25**
     - Minor changes to `bashrc_options.txt` to fix bugs with `screen`+`caddy` and `scp`.
 
