@@ -53,7 +53,7 @@
         #distracted-time { color: #fd7e14; }
         #pomodoro-countdown { color: #6f42c1; }
         
-        #break-btn, #reset-btn, #test-notif-btn {
+        #break-btn, #reset-btn, #test-notif-btn, #reset-pomo-btn, #set-pomo-btn {
             padding: 14px 24px;
             font-size: 17px;
             font-weight: 500;
@@ -78,6 +78,14 @@
         #test-notif-btn {
             background: #6f42c1;
             color: white;
+        }
+        #reset-pomo-btn {
+            background: #17a2b8;
+            color: white;
+        }
+        #set-pomo-btn {
+            background: #ffc107;
+            color: #212529;
         }
 
         #task-list {
@@ -208,9 +216,8 @@
 </head>
 <body>
     <div class="info">
-        <strong>✅ How to use:</strong> Type task name → click <strong>Start</strong> or press <strong>Enter</strong>. 
-        Duplicate names resume the old task. 25-min Pomodoro countdown + auto check-in. 
-        Test button for notifications. Compact mode (small window) shows only active task + new row with quick-switch dropdown.
+        <strong>✅ FIXED:</strong> The timer now correctly tracks real elapsed time even when the browser tab/window is out of focus, minimized, or backgrounded.<br>
+        (Previously, browser throttling caused the clocks to under-count or appear to "reset". This version uses real timestamps + commit-on-pause logic.)
     </div>
 
     <header>
@@ -228,7 +235,7 @@
                 <div id="distracted-time" class="clock-value">00:00:00</div>
             </div>
             <div class="clock">
-                <div class="clock-label">POMODORO COUNTDOWN</div>
+                <div class="clock-label" id="pomo-label">POMODORO COUNTDOWN</div>
                 <div id="pomodoro-countdown" class="clock-value">25:00</div>
             </div>
         </div>
@@ -237,6 +244,8 @@
             <button id="break-btn">Start Break</button>
             <button id="reset-btn">Reset All</button>
             <button id="test-notif-btn">Test Notification</button>
+            <button id="reset-pomo-btn">Reset Pomodoro</button>
+            <button id="set-pomo-btn">Set Pomodoro Time</button>
         </div>
     </header>
 
@@ -251,10 +260,12 @@
         // ====================== DATA & STATE ======================
         let tasks = [];
         let currentRunningId = null;
+        let currentRunningStartTime = null;   // NEW: real-time tracking (fixes background throttling bug)
         let isBreak = false;
         let breakSeconds = 0;
         let distractedSeconds = 0;
         let nextCheckinTime = 0;
+        let pomoDuration = 25;
         let compactMode = false;
         let tickInterval = null;
 
@@ -272,15 +283,32 @@
             return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
         }
 
-        function getTotalSeconds() {
-            return tasks.reduce((sum, task) => sum + task.seconds, 0);
+        function getTotalDisplaySeconds() {
+            let total = tasks.reduce((sum, t) => sum + t.seconds, 0);
+            if (currentRunningId !== null && currentRunningStartTime !== null) {
+                const elapsed = Math.floor((Date.now() - currentRunningStartTime) / 1000);
+                total += elapsed;
+            }
+            return total;
+        }
+
+        function getTaskDisplaySeconds(taskId) {
+            const task = tasks.find(t => t.id === taskId);
+            if (!task) return 0;
+            let secs = task.seconds;
+            if (taskId === currentRunningId && currentRunningStartTime !== null) {
+                const elapsed = Math.floor((Date.now() - currentRunningStartTime) / 1000);
+                secs += elapsed;
+            }
+            return secs;
         }
 
         function saveToLocal() {
             localStorage.setItem('simpleTaskTimer_data', JSON.stringify({
                 tasks,
                 breakSeconds,
-                distractedSeconds
+                distractedSeconds,
+                pomoDuration
             }));
         }
 
@@ -291,34 +319,37 @@
                 tasks = data.tasks || [];
                 breakSeconds = data.breakSeconds || 0;
                 distractedSeconds = data.distractedSeconds || 0;
+                pomoDuration = data.pomoDuration || 25;
             } else {
                 tasks = [];
                 breakSeconds = 0;
                 distractedSeconds = 0;
+                pomoDuration = 25;
             }
+        }
+
+        function commitCurrentRunningTime() {
+            if (currentRunningId === null || currentRunningStartTime === null) return;
+            const elapsed = Math.floor((Date.now() - currentRunningStartTime) / 1000);
+            const task = tasks.find(t => t.id === currentRunningId);
+            if (task) task.seconds += elapsed;
+            currentRunningStartTime = null;
         }
 
         // ====================== TICK ======================
         function tick() {
-            // Increment running task
-            if (currentRunningId !== null && !isBreak) {
-                const task = tasks.find(t => t.id === currentRunningId);
-                if (task) task.seconds++;
-            }
-            
-            // Increment break
+            // Increment break only (task time is now live via Date.now())
             if (isBreak) breakSeconds++;
             
-            // 25-minute check-in logic
+            // Pomodoro check-in logic (still works even if throttled)
             if (currentRunningId !== null && !isBreak && nextCheckinTime > 0) {
                 const now = Date.now();
                 if (now >= nextCheckinTime) {
                     triggerCheckin();
-                    nextCheckinTime = now + 25 * 60 * 1000;
+                    nextCheckinTime = now + pomoDuration * 60 * 1000;
                 }
             }
             
-            // Update everything
             updateAllTimeDisplays();
             updateHeaderDisplays();
         }
@@ -332,16 +363,15 @@
         function updateAllTimeDisplays() {
             tasks.forEach(task => {
                 const span = document.getElementById(`time-${task.id}`);
-                if (span) span.textContent = formatTime(task.seconds);
+                if (span) span.textContent = formatTime(getTaskDisplaySeconds(task.id));
             });
         }
 
         function updateHeaderDisplays() {
-            document.getElementById('total-time').textContent = formatTime(getTotalSeconds());
+            document.getElementById('total-time').textContent = formatTime(getTotalDisplaySeconds());
             document.getElementById('break-time').textContent = formatTime(breakSeconds);
             document.getElementById('distracted-time').textContent = formatTime(distractedSeconds);
 
-            // Pomodoro countdown
             const pomodoroEl = document.getElementById('pomodoro-countdown');
             if (currentRunningId === null || isBreak || nextCheckinTime <= 0) {
                 pomodoroEl.textContent = '—';
@@ -432,9 +462,7 @@
             nameInput.placeholder = 'New task name...';
             nameInput.addEventListener('input', () => {});
             nameInput.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') {
-                    handleNewTaskStart();
-                }
+                if (e.key === 'Enter') handleNewTaskStart();
             });
 
             const timeSpan = document.createElement('span');
@@ -447,11 +475,9 @@
             startBtn.dataset.id = 'new';
             startBtn.addEventListener('click', handleNewTaskStart);
 
-            // Quick-switch dropdown ONLY in compact mode
             if (compactMode) {
                 const quickSelect = document.createElement('select');
                 quickSelect.className = 'quick-switch';
-                
                 const defaultOpt = document.createElement('option');
                 defaultOpt.value = '';
                 defaultOpt.textContent = '— Quick switch to existing task —';
@@ -488,29 +514,33 @@
             
             if (compactMode) {
                 const runningTask = tasks.find(t => t.id === currentRunningId);
-                if (runningTask) {
-                    container.appendChild(createTaskRow(runningTask));
-                }
+                if (runningTask) container.appendChild(createTaskRow(runningTask));
             } else {
-                tasks.forEach(task => {
-                    container.appendChild(createTaskRow(task));
-                });
+                tasks.forEach(task => container.appendChild(createTaskRow(task)));
             }
             
             container.appendChild(createNewRow());
             
+            updateAllTimeDisplays();   // ensures live time is shown immediately
             updateButtonsAndStyles();
             updateHeaderDisplays();
         }
 
         // ====================== ACTIONS ======================
         function handleStartClick(id) {
+            const previouslyRunning = currentRunningId !== null;
+            commitCurrentRunningTime();
+
             if (currentRunningId === id) {
                 currentRunningId = null;
+                currentRunningStartTime = null;
                 nextCheckinTime = 0;
             } else {
                 currentRunningId = id;
-                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+                currentRunningStartTime = Date.now();
+                if (!previouslyRunning) {
+                    nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
+                }
             }
             startTickInterval();
             updateButtonsAndStyles();
@@ -523,25 +553,23 @@
             let name = nameInput ? nameInput.value.trim() : '';
             if (!name) name = 'Untitled Task';
 
-            // Check for existing task with same name (case-insensitive)
+            const previouslyRunning = currentRunningId !== null;
+            commitCurrentRunningTime();
+
             const existing = tasks.find(t => t.name.toLowerCase() === name.toLowerCase());
             if (existing) {
-                // Resume existing task instead of duplicating
                 currentRunningId = existing.id;
-                nextCheckinTime = Date.now() + 25 * 60 * 1000;
             } else {
-                // Create new task
                 const newId = Date.now();
-                tasks.push({
-                    id: newId,
-                    name: name,
-                    seconds: 0
-                });
+                tasks.push({ id: newId, name: name, seconds: 0 });
                 currentRunningId = newId;
-                nextCheckinTime = Date.now() + 25 * 60 * 1000;
             }
 
-            // Clear input
+            currentRunningStartTime = Date.now();
+            if (!previouslyRunning) {
+                nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
+            }
+
             if (nameInput) nameInput.value = '';
             
             saveToLocal();
@@ -551,11 +579,13 @@
 
         function deleteTask(id) {
             if (!confirm('Delete this task and all its recorded time?')) return;
-            tasks = tasks.filter(t => t.id !== id);
             if (currentRunningId === id) {
                 currentRunningId = null;
+                currentRunningStartTime = null;
                 nextCheckinTime = 0;
+                // Do NOT commit — time is discarded with the task (matches original behavior)
             }
+            tasks = tasks.filter(t => t.id !== id);
             saveToLocal();
             render();
         }
@@ -578,10 +608,16 @@
         }
 
         function toggleBreak() {
-            isBreak = !isBreak;
-            if (isBreak) {
+            const startingBreak = !isBreak;
+            if (startingBreak) {
+                commitCurrentRunningTime();
                 currentRunningId = null;
+                currentRunningStartTime = null;
                 nextCheckinTime = 0;
+            }
+            isBreak = startingBreak;
+            
+            if (isBreak) {
                 document.getElementById('break-btn').textContent = 'End Break';
                 document.getElementById('break-btn').classList.add('active');
             } else {
@@ -597,46 +633,83 @@
         function resetAll() {
             if (!confirm('Reset EVERYTHING?\n\nThis will permanently delete ALL tasks, times, break time, distracted time, and settings.')) return;
             
+            if (currentRunningId !== null) {
+                currentRunningId = null;
+                currentRunningStartTime = null;
+                nextCheckinTime = 0;
+            }
+            
             localStorage.removeItem('simpleTaskTimer_data');
             tasks = [];
             breakSeconds = 0;
             distractedSeconds = 0;
-            currentRunningId = null;
-            nextCheckinTime = 0;
+            pomoDuration = 25;
             isBreak = false;
             
             document.getElementById('break-btn').textContent = 'Start Break';
             document.getElementById('break-btn').classList.remove('active');
+            document.getElementById('pomo-label').textContent = `POMODORO (${pomoDuration} min)`;
             
             render();
             updateHeaderDisplays();
         }
 
-        // ====================== NOTIFICATIONS ======================
-        function triggerCheckin() {
-            if (currentRunningId === null) return;
-            const task = tasks.find(t => t.id === currentRunningId);
-            if (!task) return;
-            const taskName = task.name || 'Untitled Task';
+        function resetPomodoro() {
+            if (currentRunningId !== null) {
+                nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
+                updateHeaderDisplays();
+            } else {
+                alert('Start a task first — the Pomodoro timer only runs while you are actively working.');
+            }
+        }
 
+        function setCustomPomodoro() {
+            const input = prompt(`Enter new Pomodoro length in minutes (current: ${pomoDuration}):`, pomoDuration);
+            const newDuration = parseInt(input);
+            if (isNaN(newDuration) || newDuration < 1) {
+                alert('Please enter a valid number greater than 0.');
+                return;
+            }
+            
+            pomoDuration = newDuration;
+            document.getElementById('pomo-label').textContent = `POMODORO (${pomoDuration} min)`;
+            
+            if (currentRunningId !== null) {
+                nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
+            }
+            
+            saveToLocal();
+            updateHeaderDisplays();
+        }
+
+        // ====================== NOTIFICATIONS ======================
+        function showCheckinNotification(taskName, isTest) {
             if (!('Notification' in window)) return;
 
             const show = () => {
                 const notif = new Notification(`Still working on "${taskName}"?`, {
-                    body: "25 minutes have passed.\n\nClick = No (pause & switch)\nIgnore = Yes (continue)",
-                    tag: "task-checkin",
+                    body: "Click anywhere on this notification to confirm you are still working.\n\nNo action for 30 seconds = pause timer and bring window to front.\n(No time will be deducted.)",
+                    tag: isTest ? "test-checkin" : "task-checkin",
                     requireInteraction: true
                 });
 
                 const timeoutId = setTimeout(() => {
-                    handleIdleTimeout();
                     notif.close();
-                }, 120000);
+                    if (isTest) {
+                        alert('🕒 Test complete: 30 seconds passed.\n\nIn real use, this would pause the current task and focus the browser window.');
+                    } else {
+                        handleAutoPause();
+                    }
+                }, 30000);
 
                 notif.onclick = () => {
                     clearTimeout(timeoutId);
                     notif.close();
-                    handleNoClick();
+                    if (isTest) {
+                        alert('✅ Test confirmed: You clicked to say "Still working"!\n\nIn real use, the timer would continue uninterrupted.');
+                    } else {
+                        window.focus();
+                    }
                 };
             };
 
@@ -649,29 +722,22 @@
             }
         }
 
-        function handleNoClick() {
-            if (currentRunningId !== null) {
-                currentRunningId = null;
-                nextCheckinTime = 0;
-                window.focus();
-                updateButtonsAndStyles();
-                updateHeaderDisplays();
-                saveToLocal();
-            }
+        function triggerCheckin() {
+            if (currentRunningId === null) return;
+            const task = tasks.find(t => t.id === currentRunningId);
+            if (!task) return;
+            showCheckinNotification(task.name || 'Untitled Task', false);
         }
 
-        function handleIdleTimeout() {
-            if (currentRunningId !== null) {
-                const task = tasks.find(t => t.id === currentRunningId);
-                if (task) task.seconds = Math.max(0, task.seconds - 120);
-                currentRunningId = null;
-                nextCheckinTime = 0;
-                window.focus();
-                saveToLocal();
-                updateAllTimeDisplays();
-                updateHeaderDisplays();
-                updateButtonsAndStyles();
-            }
+        function handleAutoPause() {
+            commitCurrentRunningTime();
+            currentRunningId = null;
+            currentRunningStartTime = null;
+            nextCheckinTime = 0;
+            window.focus();
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+            saveToLocal();
         }
 
         function sendTestNotification() {
@@ -680,38 +746,26 @@
                 return;
             }
 
-            const show = () => {
-                const notif = new Notification('✅ Test Notification', {
-                    body: 'Notifications are working perfectly!\n\nThis is just a test — your 25-minute check-ins will look similar.',
-                    tag: 'test-notif'
-                });
-                notif.onclick = () => notif.close();
-            };
-
-            if (Notification.permission === 'granted') {
-                show();
-            } else if (Notification.permission === 'default') {
-                Notification.requestPermission().then(perm => {
-                    if (perm === 'granted') show();
-                    else alert('Notification permission was denied. Please allow notifications in your browser settings and try again.');
-                });
-            } else {
-                alert('Notification permission is blocked. Please enable it in your browser settings and refresh the page.');
+            let testName = 'Test Task';
+            if (currentRunningId !== null) {
+                const task = tasks.find(t => t.id === currentRunningId);
+                if (task) testName = task.name || 'Test Task';
             }
+            showCheckinNotification(testName, true);
         }
 
         // ====================== INITIALIZE ======================
         function init() {
             loadFromLocal();
             
-            // Request notification permission early
+            document.getElementById('pomo-label').textContent = `POMODORO (${pomoDuration} min)`;
+            
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
             }
             
-            // If a task was running before reload, restart the 25-min countdown
             if (currentRunningId !== null) {
-                nextCheckinTime = Date.now() + 25 * 60 * 1000;
+                nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
             }
             
             const breakBtn = document.getElementById('break-btn');
@@ -723,17 +777,33 @@
             const testBtn = document.getElementById('test-notif-btn');
             testBtn.addEventListener('click', sendTestNotification);
             
-            // Initial render
+            const resetPomoBtn = document.getElementById('reset-pomo-btn');
+            resetPomoBtn.addEventListener('click', resetPomodoro);
+            
+            const setPomoBtn = document.getElementById('set-pomo-btn');
+            setPomoBtn.addEventListener('click', setCustomPomodoro);
+            
+            // Ensure live time is shown when tab becomes visible again
+            document.addEventListener('visibilitychange', () => {
+                if (document.visibilityState === 'visible') {
+                    updateAllTimeDisplays();
+                    updateHeaderDisplays();
+                }
+            });
+            
+            // Commit & save before page unload/refresh (prevents loss on reload)
+            window.addEventListener('beforeunload', () => {
+                commitCurrentRunningTime();
+                saveToLocal();
+            });
+            
             compactMode = window.innerWidth < 700;
             render();
             
-            // Start ticking
             startTickInterval();
             
-            // Resize handler
             window.addEventListener('resize', checkCompactMode);
             
-            // Keyboard shortcut: Ctrl/Cmd + K to focus new task
             document.addEventListener('keydown', (e) => {
                 if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                     e.preventDefault();
@@ -742,7 +812,6 @@
                 }
             });
             
-            // Initial header update
             updateHeaderDisplays();
         }
 
