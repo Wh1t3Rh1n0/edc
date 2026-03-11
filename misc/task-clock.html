@@ -187,6 +187,13 @@
             margin-bottom: 20px;
             font-size: 14px;
         }
+        .repeat-option {
+            margin-top: 8px;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
 
         /* ====================== COMPACT MODE ====================== */
         @media (max-width: 700px) {
@@ -216,8 +223,11 @@
 </head>
 <body>
     <div class="info">
-        <strong>✅ FIXED:</strong> The timer now correctly tracks real elapsed time even when the browser tab/window is out of focus, minimized, or backgrounded.<br>
-        (Previously, browser throttling caused the clocks to under-count or appear to "reset". This version uses real timestamps + commit-on-pause logic.)
+        <strong>✅ New feature:</strong> If you ignore the 25-min check-in notification, the timer pauses and (by default) a new notification repeats every 30 seconds saying “<em>X task has been paused. Click to resume</em>”.<br>
+        <label class="repeat-option">
+            <input type="checkbox" id="repeat-check" checked>
+            <span>Repeat “paused” notifications every 30 seconds (recommended)</span>
+        </label>
     </div>
 
     <header>
@@ -252,15 +262,14 @@
     <div id="task-list"></div>
 
     <footer>
-        All data saved automatically in your browser (localStorage) • Completely offline &amp; private • 
-        Notifications require one-time permission (click Test button to check)
+        All data saved automatically in your browser (localStorage) • Completely offline &amp; private
     </footer>
 
     <script>
         // ====================== DATA & STATE ======================
         let tasks = [];
         let currentRunningId = null;
-        let currentRunningStartTime = null;   // NEW: real-time tracking (fixes background throttling bug)
+        let currentRunningStartTime = null;
         let isBreak = false;
         let breakSeconds = 0;
         let distractedSeconds = 0;
@@ -268,6 +277,14 @@
         let pomoDuration = 25;
         let compactMode = false;
         let tickInterval = null;
+        let audioContext = null;
+
+        let repeatNotifications = true;           // NEW: user setting, default ON
+        let repeatInterval = null;                // holds the repeating timer
+        let lastPausedTaskId = null;              // so we know which task to resume
+
+        let originalPageTitle = '';
+        let titleFlashInterval = null;
 
         // ====================== UTILS ======================
         function formatTime(seconds) {
@@ -308,7 +325,8 @@
                 tasks,
                 breakSeconds,
                 distractedSeconds,
-                pomoDuration
+                pomoDuration,
+                repeatNotifications
             }));
         }
 
@@ -320,11 +338,13 @@
                 breakSeconds = data.breakSeconds || 0;
                 distractedSeconds = data.distractedSeconds || 0;
                 pomoDuration = data.pomoDuration || 25;
+                repeatNotifications = data.repeatNotifications !== false; // default true
             } else {
                 tasks = [];
                 breakSeconds = 0;
                 distractedSeconds = 0;
                 pomoDuration = 25;
+                repeatNotifications = true;
             }
         }
 
@@ -336,12 +356,156 @@
             currentRunningStartTime = null;
         }
 
-        // ====================== TICK ======================
+        function stopTitleFlash() {
+            if (titleFlashInterval) {
+                clearInterval(titleFlashInterval);
+                titleFlashInterval = null;
+                document.title = originalPageTitle;
+            }
+        }
+
+        function stopRepeatNotifications() {
+            if (repeatInterval) {
+                clearInterval(repeatInterval);
+                repeatInterval = null;
+            }
+        }
+
+        // ====================== SOUND ======================
+        function playNotificationSound() {
+            try {
+                if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                if (audioContext.state === 'suspended') audioContext.resume();
+                const osc = audioContext.createOscillator();
+                const gain = audioContext.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, audioContext.currentTime);
+                gain.gain.value = 0.4;
+                osc.connect(gain).connect(audioContext.destination);
+                osc.start();
+                setTimeout(() => { osc.frequency.setValueAtTime(660, audioContext.currentTime); }, 180);
+                setTimeout(() => osc.stop(), 700);
+            } catch(e){}
+        }
+
+        // ====================== NOTIFICATIONS ======================
+        function showCheckinNotification(taskName, isTest) {
+            playNotificationSound();
+
+            if (!('Notification' in window)) return;
+
+            const show = () => {
+                const notif = new Notification(`Still working on "${taskName}"?`, {
+                    body: "Click anywhere on this notification to confirm you are still working.\n\nNo action for 30 seconds = pause timer + " + (repeatNotifications ? "repeating reminders" : "stop"),
+                    tag: isTest ? "test-checkin" : "task-checkin",
+                    requireInteraction: true
+                });
+
+                const timeoutId = setTimeout(() => {
+                    notif.close();
+                    if (!isTest) handleAutoPause();
+                }, 30000);
+
+                notif.onclick = () => {
+                    clearTimeout(timeoutId);
+                    notif.close();
+                };
+            };
+
+            if (Notification.permission === 'granted') show();
+            else if (Notification.permission === 'default') Notification.requestPermission().then(p => { if (p === 'granted') show(); });
+        }
+
+        function showPausedNotification(taskName) {
+            playNotificationSound();
+
+            const show = () => {
+                const notif = new Notification(`${taskName} has been paused`, {
+                    body: "Click this notification to resume your work.",
+                    tag: "paused-reminder",
+                    requireInteraction: true
+                });
+
+                notif.onclick = () => {
+                    notif.close();
+                    resumePausedTask();
+                };
+            };
+
+            if (Notification.permission === 'granted') show();
+        }
+
+        function triggerCheckin() {
+            if (currentRunningId === null) return;
+            const task = tasks.find(t => t.id === currentRunningId);
+            if (!task) return;
+            showCheckinNotification(task.name || 'Untitled Task', false);
+        }
+
+        function handleAutoPause() {
+            const task = tasks.find(t => t.id === currentRunningId);
+            lastPausedTaskId = currentRunningId;
+
+            commitCurrentRunningTime();
+            currentRunningId = null;
+            currentRunningStartTime = null;
+            nextCheckinTime = 0;
+
+            window.focus();
+
+            // Persistent title flash until user returns
+            let flashOn = false;
+            titleFlashInterval = setInterval(() => {
+                document.title = flashOn ? '⏰ TIMER PAUSED — RETURN TO WORK!' : originalPageTitle;
+                flashOn = !flashOn;
+            }, 380);
+
+            // Start repeating notifications if enabled
+            if (repeatNotifications && lastPausedTaskId && task) {
+                repeatInterval = setInterval(() => {
+                    showPausedNotification(task.name || 'Untitled Task');
+                }, 30000);
+            }
+
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+            saveToLocal();
+        }
+
+        function resumePausedTask() {
+            if (!lastPausedTaskId) return;
+
+            currentRunningId = lastPausedTaskId;
+            currentRunningStartTime = Date.now();
+            nextCheckinTime = Date.now() + pomoDuration * 60 * 1000;
+
+            stopRepeatNotifications();
+            stopTitleFlash();
+
+            lastPausedTaskId = null;
+
+            updateButtonsAndStyles();
+            updateHeaderDisplays();
+            saveToLocal();
+        }
+
+        function sendTestNotification() {
+            if (!('Notification' in window)) {
+                alert('Notifications are not supported in this browser.');
+                return;
+            }
+            let testName = 'Test Task';
+            if (currentRunningId !== null) {
+                const task = tasks.find(t => t.id === currentRunningId);
+                if (task) testName = task.name || 'Test Task';
+            }
+            showCheckinNotification(testName, true);
+        }
+
+        // ====================== TICK & DISPLAY (unchanged except calls to stop repeat) ======================
         function tick() {
-            // Increment break only (task time is now live via Date.now())
             if (isBreak) breakSeconds++;
             
-            // Pomodoro check-in logic (still works even if throttled)
             if (currentRunningId !== null && !isBreak && nextCheckinTime > 0) {
                 const now = Date.now();
                 if (now >= nextCheckinTime) {
@@ -359,7 +523,6 @@
             tickInterval = setInterval(tick, 1000);
         }
 
-        // ====================== DISPLAY UPDATES ======================
         function updateAllTimeDisplays() {
             tasks.forEach(task => {
                 const span = document.getElementById(`time-${task.id}`);
@@ -402,7 +565,7 @@
             });
         }
 
-        // ====================== COMPACT MODE ======================
+        // ====================== COMPACT MODE & RENDER (unchanged) ======================
         function checkCompactMode() {
             const shouldBeCompact = window.innerWidth < 700;
             if (shouldBeCompact !== compactMode) {
@@ -411,7 +574,6 @@
             }
         }
 
-        // ====================== RENDER ======================
         function createTaskRow(task) {
             const row = document.createElement('div');
             row.className = 'task-row';
@@ -521,13 +683,16 @@
             
             container.appendChild(createNewRow());
             
-            updateAllTimeDisplays();   // ensures live time is shown immediately
+            updateAllTimeDisplays();
             updateButtonsAndStyles();
             updateHeaderDisplays();
         }
 
         // ====================== ACTIONS ======================
         function handleStartClick(id) {
+            stopRepeatNotifications();
+            stopTitleFlash();
+
             const previouslyRunning = currentRunningId !== null;
             commitCurrentRunningTime();
 
@@ -549,6 +714,9 @@
         }
 
         function handleNewTaskStart() {
+            stopRepeatNotifications();
+            stopTitleFlash();
+
             const nameInput = document.querySelector('.new-row .task-name');
             let name = nameInput ? nameInput.value.trim() : '';
             if (!name) name = 'Untitled Task';
@@ -579,11 +747,11 @@
 
         function deleteTask(id) {
             if (!confirm('Delete this task and all its recorded time?')) return;
+            stopRepeatNotifications();
             if (currentRunningId === id) {
                 currentRunningId = null;
                 currentRunningStartTime = null;
                 nextCheckinTime = 0;
-                // Do NOT commit — time is discarded with the task (matches original behavior)
             }
             tasks = tasks.filter(t => t.id !== id);
             saveToLocal();
@@ -608,6 +776,9 @@
         }
 
         function toggleBreak() {
+            stopRepeatNotifications();
+            stopTitleFlash();
+
             const startingBreak = !isBreak;
             if (startingBreak) {
                 commitCurrentRunningTime();
@@ -631,6 +802,8 @@
         }
 
         function resetAll() {
+            stopRepeatNotifications();
+            stopTitleFlash();
             if (!confirm('Reset EVERYTHING?\n\nThis will permanently delete ALL tasks, times, break time, distracted time, and settings.')) return;
             
             if (currentRunningId !== null) {
@@ -644,11 +817,13 @@
             breakSeconds = 0;
             distractedSeconds = 0;
             pomoDuration = 25;
+            repeatNotifications = true;
             isBreak = false;
             
             document.getElementById('break-btn').textContent = 'Start Break';
             document.getElementById('break-btn').classList.remove('active');
             document.getElementById('pomo-label').textContent = `POMODORO (${pomoDuration} min)`;
+            document.getElementById('repeat-check').checked = true;
             
             render();
             updateHeaderDisplays();
@@ -682,83 +857,19 @@
             updateHeaderDisplays();
         }
 
-        // ====================== NOTIFICATIONS ======================
-        function showCheckinNotification(taskName, isTest) {
-            if (!('Notification' in window)) return;
-
-            const show = () => {
-                const notif = new Notification(`Still working on "${taskName}"?`, {
-                    body: "Click anywhere on this notification to confirm you are still working.\n\nNo action for 30 seconds = pause timer and bring window to front.\n(No time will be deducted.)",
-                    tag: isTest ? "test-checkin" : "task-checkin",
-                    requireInteraction: true
-                });
-
-                const timeoutId = setTimeout(() => {
-                    notif.close();
-                    if (isTest) {
-                        alert('🕒 Test complete: 30 seconds passed.\n\nIn real use, this would pause the current task and focus the browser window.');
-                    } else {
-                        handleAutoPause();
-                    }
-                }, 30000);
-
-                notif.onclick = () => {
-                    clearTimeout(timeoutId);
-                    notif.close();
-                    if (isTest) {
-                        alert('✅ Test confirmed: You clicked to say "Still working"!\n\nIn real use, the timer would continue uninterrupted.');
-                    } else {
-                        window.focus();
-                    }
-                };
-            };
-
-            if (Notification.permission === 'granted') {
-                show();
-            } else if (Notification.permission === 'default') {
-                Notification.requestPermission().then(perm => {
-                    if (perm === 'granted') show();
-                });
-            }
-        }
-
-        function triggerCheckin() {
-            if (currentRunningId === null) return;
-            const task = tasks.find(t => t.id === currentRunningId);
-            if (!task) return;
-            showCheckinNotification(task.name || 'Untitled Task', false);
-        }
-
-        function handleAutoPause() {
-            commitCurrentRunningTime();
-            currentRunningId = null;
-            currentRunningStartTime = null;
-            nextCheckinTime = 0;
-            window.focus();
-            updateButtonsAndStyles();
-            updateHeaderDisplays();
-            saveToLocal();
-        }
-
-        function sendTestNotification() {
-            if (!('Notification' in window)) {
-                alert('Notifications are not supported in this browser.');
-                return;
-            }
-
-            let testName = 'Test Task';
-            if (currentRunningId !== null) {
-                const task = tasks.find(t => t.id === currentRunningId);
-                if (task) testName = task.name || 'Test Task';
-            }
-            showCheckinNotification(testName, true);
-        }
-
         // ====================== INITIALIZE ======================
         function init() {
             loadFromLocal();
             
+            originalPageTitle = document.title;
             document.getElementById('pomo-label').textContent = `POMODORO (${pomoDuration} min)`;
+            document.getElementById('repeat-check').checked = repeatNotifications;
+            
+            // Checkbox listener
+            document.getElementById('repeat-check').addEventListener('change', (e) => {
+                repeatNotifications = e.target.checked;
+                saveToLocal();
+            });
             
             if ('Notification' in window && Notification.permission === 'default') {
                 Notification.requestPermission();
@@ -783,15 +894,14 @@
             const setPomoBtn = document.getElementById('set-pomo-btn');
             setPomoBtn.addEventListener('click', setCustomPomodoro);
             
-            // Ensure live time is shown when tab becomes visible again
             document.addEventListener('visibilitychange', () => {
                 if (document.visibilityState === 'visible') {
+                    stopTitleFlash();
                     updateAllTimeDisplays();
                     updateHeaderDisplays();
                 }
             });
             
-            // Commit & save before page unload/refresh (prevents loss on reload)
             window.addEventListener('beforeunload', () => {
                 commitCurrentRunningTime();
                 saveToLocal();
