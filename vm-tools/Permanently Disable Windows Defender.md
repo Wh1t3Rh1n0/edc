@@ -4,6 +4,7 @@ Permanently Disable Windows Defender
 ## Step 1:
 
 Open the Windows Defender settings GUI ("Virus & threat protection settings") and DISABLE EVERYTHING
+
 - Real-time protection
 - Cloud-delivered protection
 - Automatic sample submission
@@ -35,10 +36,16 @@ Optional: Also add exclusions for all other drive letters:
 echo a b d e f g h i j k l m n o p q r s t u v w x y z | foreach { Add-MpPreference -ExclusionPath ( $_ + ":\" ) }
 ```
 
+## Step 3: Disable additional Windows defenses
 
-## Step 3: Reboot.
+Settings >> Windows Security >> App & browser control >> Reputation-based protection settings
+
+- Disable EVERYTHING
 
 
-## Step 4: 
+## Step 4: Reboot.
+
+
+## Step 5: 
 
 Check the Windows Defender settings in the GUI again. It should now say Defender is disabled and managed by your organization.
